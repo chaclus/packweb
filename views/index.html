@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+
+    <link href="../public/css/bootstrap.css" rel="stylesheet">
+    <script src="../public/js/jquery-3.2.1.js"></script>
+    <script src="../public/js/bootstrap.js"></script>
+    <script src="../public/js/socket.io-client/socket.io.js"></script>
+
+    <style>
+        table {
+            table-layout: fixed;
+        }
+        table th, table td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .log-panel{
+            width: 100%;
+            height: 300px;
+            overflow: auto;
+            border-radius: 4px;
+            background-color: #eee;
+        }
+
+        .log-item{
+
+        }
+
+    </style>
+</head>
+<body class="modal-open">
+
+    <div id="app">
+        <div role="navigation" class="navbar">
+
+        </div>
+
+        <div class="container-fluid">
+
+        </div>
+        <div class="right">
+            <div class="container">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" id="add" class="btn btn-primary">新增</button>
+
+                        <h4 id="notify" class="modal-title" style="text-align: center;"></h4>
+                    </div>
+                </div>
+
+                <div class="modal-content" id="addPjt" hidden>
+                    <div class="modal-header">
+                        <h4 class="modal-title" style="text-align: center">项目新增</h4>
+                    </div>
+
+
+                    <div class="modal-body">
+                        <form id="myForm" class="form-horizontal">
+                            <input type="hidden" id="aid">
+                            <div class="form-group">
+                                <label class="col-sm-2 control-label">SVN地址</label>
+                                <div class="col-sm-10">
+                                    <input type="text" class="form-control" name="pjt_url" id="pjt_url" placeholder="项目SVN地址">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-2 control-label">工作空间</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="root_dir" id="root_dir" placeholder="工作空间目录">
+                                </div>
+
+                                <label class="col-sm-2 control-label">启动文件</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="run_script" id="run_script" placeholder="项目启动文件的文件名">
+                                </div>
+                            </div>
+
+
+                            <div class="form-group">
+                                <label class="col-sm-2 control-label">部署目录</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="r_deploy_dir" id="r_deploy_dir" placeholder="项目部署路径，必填">
+                                </div>
+
+                                <label class="col-sm-2 control-label">备份目录</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="r_bak_dir" id="r_bak_dir" placeholder="项目备份目录，必填">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="col-sm-2 control-label">Server密码</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="server_pass" id="server_pass" placeholder="服务器密码，必填">
+                                </div>
+
+                                <label class="col-sm-2 control-label">Client密码</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="sudo_pass" id="sudo_pass" placeholder="机器密码，选填，使用命令sudo时，此项必填">
+                                </div>
+                            </div>
+
+
+
+
+
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+
+                        <!--<button type="button" class="btn btn-default">取消</button>-->
+                        <button type="button" id="sbtn" class="btn btn-primary">确认</button>
+                    </div>
+                </div>
+
+
+                <div class="modal-content">
+                    <div class="modal-footer">
+                        <h4 class="modal-title" style="text-align: center">项目列表</h4>
+                    </div>
+                    <div class="modal-body">
+
+                        <table class="table table-hover">
+
+                            <thead>
+                                <tr>
+                                    <th style="width: 12%;">项目名称</th>
+                                    <th style="width: 25%;">项目地址</th>
+                                    <th style="width: 25%;">项目路径</th>
+                                    <th style="width: 25%;">工作空间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tb"></tbody>
+                        </table>
+
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Modal -->
+            <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                            <h4 class="modal-title" id="myModalLabel">执行面板</h4>
+                            <h4 id="notify_m" class="modal-title" style="text-align: center;"></h4>
+                        </div>
+                        <div class="modal-body">
+                            <div id="uForm">
+                                <form class="form-horizontal" id="modalForm">
+                                    <input type="hidden" id="mid">
+                                    <div class="form-group">
+                                        <label class="col-sm-2 control-label">成员</label>
+                                        <div class="col-sm-4">
+                                            <input type="text" class="form-control" name="authors" id="authors" placeholder="指定成员，多个','分割">
+                                        </div>
+
+                                        <label class="col-sm-2 control-label">过滤文件夹</label>
+                                        <div class="col-sm-4">
+                                            <input type="text" class="form-control" name="ignore_dirs" id="ignore_dirs" placeholder="过滤指定文件夹，多个','分割">
+                                        </div>
+                                    </div>
+
+
+                                    <div class="form-group">
+                                        <label class="col-sm-2 control-label">过滤文件</label>
+                                        <div class="col-sm-10">
+                                            <input type="text" class="form-control" name="ignore_files" id="ignore_files" placeholder="过滤指定文件，多个','分割">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="col-sm-2 control-label">上传指令</label>
+                                        <div class="col-sm-10">
+                                            <textarea class="form-control" rows="3" name="scps" id="scps" placeholder="上传命令"></textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="col-sm-2 control-label">时间区间</label>
+                                        <div class="col-sm-5">
+                                            <input type="date" class="form-control" name="btime" id="btime"  placeholder="开始时间">
+                                        </div>
+                                        <div class="col-sm-5">
+                                            <input type="date" class="form-control" name="etime" id="etime"  placeholder="结束时间">
+                                        </div>
+                                    </div>
+
+
+                                    <div style="display: flex;align-items: center; justify-content: center;">
+                                        <button type="button" id="mu" class="btn btn-default">更新</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div id="slog" class="form-group">
+                                <div class="log-panel"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <div>
+                                <button type="button" id="tar" class="btn btn-primary auto">打包</button>
+                                <button type="button" id="up" class="btn btn-primary auto">上传</button>
+                                <button type="button" id="bak" class="btn btn-primary auto">备份</button>
+                                <button type="button" id="deploy" class="btn btn-primary auto">部署</button>
+
+                                <button type="button" id="auto" class="btn btn-primary">auto</button>
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let isShow = false;
+            let ERR_MSG = '网络连接错误', SUC_MSG = '操作成功', ERR_WITH_CODE = '操作失败,错误代码: ';
+            let isDebug = true;
+            let api_server = window.location.origin;
+            let socket_server = window.location.protocol + '//' + window.location.hostname + ':7001/io';
+            if(isDebug) {
+                api_server = 'http://114.215.31.72:7000';
+                socket_server = 'http://114.215.31.72:7001/io';
+            }
+
+            let show = function () {
+                if(isShow) {
+                    $('#addPjt').hide();
+                    isShow = false;
+                    $('#add').text('新增');
+                    clear();
+                }else{
+                    $('#addPjt').show();
+                    isShow = true;
+                    $('#add').text('隐藏');
+                }
+            };
+
+            $('#add').on('click', show);
+
+            let clear = () => {
+                $('#aid').val('');
+
+                $('#pjt_url').val('');
+                $('#root_dir').val('');
+                $('#run_script').val('');
+                $('#server_pass').val('');
+                $('#sudo_pass').val('');
+                $('#r_deploy_dir').val('');
+                $('#r_bak_dir').val('');
+
+                $('#scps').val('');
+                $('#btime').val('');
+                $('#etime').val('');
+
+                $('#mid').val('');
+                $('#authors').val('');
+
+                $('#ignore_dirs').val('');
+                $('#ignore_files').val('');
+            };
+
+            //状态通知
+            let notify = (data) => {
+                let key = data.key;
+                if(!key){
+                    return;
+                }
+                let color = data.type && data.type === 1 ? 'red' : 'green';
+
+                let msg = SUC_MSG;
+                if(data.type === 1) {
+                    let er_msg = data.msg;
+                    if( er_msg){
+                        msg = typeof er_msg === 'number' ? ERR_WITH_CODE + er_msg : er_msg;
+                    }else{
+                        msg = ERR_MSG;
+                    }
+                }
+
+                let interval = data.interval ? data.interval : 2; //通知显示时长，单位秒
+
+                let notifyObj = $('#' + key);
+
+                notifyObj.css('color', color);
+                notifyObj.text(msg);
+
+                setTimeout(function () {
+                    notifyObj.text('');
+                }, interval * 1000);
+            };
+
+
+            //封装get请求
+            let get = (url, key) => {
+                return new Promise((resolve, reject) => {
+                    let notify_key = key ? key: 'notify';
+
+                    $.get(api_server + url).done((ret) => {
+                        if (ret.returncode === 200) {
+                            resolve(ret.data);
+                            notify({key: notify_key});
+                        }else{
+                            reject({code: ret.returncode});
+                            notify({key: notify_key, type: 1, msg: ret.returncode});
+                        }
+                    }).fail((err) => {
+                        reject({status: err.status, msg: err.statusText, obj: err});
+                        notify({key: notify_key, type: 1});
+                    })
+                });
+            };
+
+            //封装post请求
+            let post = (data) => {
+                return new Promise((resolve, reject) => {
+                    let notify_key = data.notify_key ? data.notify_key: 'notify';
+
+                    let url = api_server + data.url;
+                    let doc = data.data;
+                    $.ajax({
+                        url: url,
+                        type: 'POST',
+                        data: doc
+                    }).done((ret) => {
+                        if (ret.returncode === 200) {
+                            resolve(ret.data);
+                            notify({key: notify_key});
+                        } else {
+                            reject({code: ret.returncode});
+                            notify({key: notify_key, type: 1, msg: ret.returncode});
+                        }
+                    }).fail((err) => {
+                        reject({status: err.status, msg: err.statusText, obj: err});
+                        notify({key: notify_key, type: 1});
+                    });
+                });
+            };
+
+
+            $('#sbtn').on('click', function () {
+                let doc = {
+                    pjt_url: $('#pjt_url').val(),
+                    root_dir: $('#root_dir').val(),
+
+                    run_script: $('#run_script').val(),
+
+                    server_pass: $('#server_pass').val(),
+                    sudo_pass: $('#sudo_pass').val(),
+
+                    r_deploy_dir: $('#r_deploy_dir').val(),
+                    r_bak_dir: $('#r_bak_dir').val(),
+                };
+
+                let aid = $('#aid').val();
+                if(aid) {
+                    doc.id = aid;
+                    let url = '/pw/v1/pjt/update';
+                    post({
+                        url: url,
+                        data: doc
+                    }).then((ret) => {
+                        isShow = true;
+                        show();
+
+                        notify({key: 'notify'});
+                    }).catch((err) => {
+                        console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                    });
+                }else{
+
+                    let url = '/pw/v1/pjt/save';
+                    post({
+                        url: url,
+                        data: doc
+                    }).then((ret) => {
+                        getPjtList();
+
+                        isShow = true;
+                        show();
+                    }).catch((err) => {
+                        console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                    });
+                }
+            });
+
+
+            //更新弹出
+            $('#mu').on('click', () => {
+                let doc = {
+                    id: $('#mid').val(),
+                    authors: $('#authors').val(),
+                    ignore_dirs: $('#ignore_dirs').val(),
+                    ignore_files: $('#ignore_files').val(),
+
+                    scps: $('#scps').val(),
+                    btime: $('#btime').val(),
+                    etime: $('#etime').val(),
+                };
+
+                let url = '/pw/v1/pjt/update';
+                post({
+                    url: url,
+                    data: doc,
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('update success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+            //打包
+            $('#tar').on('click', () => {
+                let url = '/pw/v1/pjt/tar';
+                post({
+                    url: url,
+                    data: {
+                        id: $('#mid').val()
+                    },
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('tar success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+
+            //上传
+            $('#up').on('click', () => {
+                let url = '/pw/v1/pjt/up';
+                post({
+                    url: url,
+                    data: {
+                        id: $('#mid').val()
+                    },
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('up success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+            //备份
+            $('#bak').on('click', () => {
+                let url = '/pw/v1/pjt/bak';
+                post({
+                    url: url,
+                    data: {
+                        id: $('#mid').val()
+                    },
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('bak success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+
+            //部署
+            $('#deploy').on('click', () => {
+                let url = '/pw/v1/pjt/deploy';
+                post({
+                    url: url,
+                    data: {
+                        id: $('#mid').val()
+                    },
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('bak success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+            //一键更新
+            $('#auto').on('click', () => {
+                let url = '/pw/v1/pjt/auto';
+                post({
+                    url: url,
+                    data: {
+                        id: $('#mid').val()
+                    },
+                    notify_key: 'notify_m'
+                }).then((ret) => {
+                    console.log('bak success');
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            });
+
+
+            let showAuto = (flag) => {
+                if(flag) {
+                    $('.auto').hide();
+                    $('#auto').show();
+                }else{
+                    $('.auto').show();
+                    $('#auto').hide();
+                }
+            };
+
+
+            /**
+             * 获取列表
+             */
+            let getPjtList = function () {
+                $.get(api_server + '/pw/v1/pjt/list').done((data)=>{
+                    if(data.returncode === 200) {
+                        var list = data.data.list;
+
+                        let htmlstr = "";
+                        for(let i=0;i<list.length;i++) {
+                            let pjt = list[i];
+                            htmlstr += '<tr>';
+                                htmlstr += '<td>' + pjt.pjt_name + '</td>';
+                                htmlstr += '<td>' + pjt.pjt_url + '</td>';
+                                htmlstr += '<td>' + pjt.pjt_dir +'</td>';
+                                htmlstr += '<td>' + pjt.pjt_out + '</td>';
+                                htmlstr += '<td>' +
+                                                '<button type="button" class="btn btn-primary uid" value="'+pjt.id+'">修改</button>' +
+                                                '<button type="button" class="btn btn-primary excid" value="'+pjt.id+'" data-toggle="modal" data-target="#myModal">执行</button>' +
+                                            '</td>';
+                            htmlstr += '</tr>';
+                        }
+
+                        $('#tb').html(htmlstr);
+
+                        //binding click
+                        $('#tb').delegate('.excid', 'click', (event) => {
+                            let id = event.currentTarget.value;
+                            $('#mid').val(id);
+                            $.get(api_server + '/pw/v1/pjt/get?id=' + id).done((ret) => {
+                                if (ret.returncode === 200) {
+                                    let pjt = ret.data;
+                                    if (pjt) {
+                                        $('#authors').val(pjt.authors);
+                                        $('#ignore_dirs').val(pjt.ignore_dirs);
+                                        $('#ignore_files').val(pjt.ignore_files);
+
+                                        $('#scps').val(pjt.scps);
+                                        $('#btime').val(pjt.btime);
+                                        $('#etime').val(pjt.etime);
+
+                                    } else {
+                                        console.warn('get pjt data is null, id: ' + id);
+                                    }
+
+                                    let auto = pjt.auto;
+                                    //是否显示 一键更新 按钮
+                                    if(auto && auto === 1) {
+                                        showAuto(true);
+                                    }else{
+                                        showAuto();
+                                    }
+                                }
+                            }).fail((err) => {
+                                console.error('status: ' + err.status + ', msg: ' + err.statusText);
+                            })
+                        });
+
+
+                        $('#tb').delegate('.uid', 'click', (event) => {
+                            let id = event.currentTarget.value;
+                            $('#aid').val(id);
+
+                            let url = '/pw/v1/pjt/get?id=' + id;
+                            get(url).then((data) => {
+                                if (data) {
+                                    $('#pjt_url').val(data.pjt_url);
+                                    $('#root_dir').val(data.root_dir);
+                                    $('#run_script').val(data.run_script);
+                                    $('#server_pass').val(data.server_pass);
+                                    $('#sudo_pass').val(data.sudo_pass);
+                                    $('#r_deploy_dir').val(data.r_deploy_dir);
+                                    $('#r_bak_dir').val(data.r_bak_dir);
+
+                                    isShow = false;
+                                    show();
+                                } else {
+                                    console.error('field to get project, id:' + id);
+                                }
+
+                            }).catch((err) => {
+                                console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                            })
+                        });
+                    }
+                }).fail((err) => {
+                    console.error('status: ' + err.status +', msg: ' + err.statusText);
+                })
+            };
+            getPjtList();
+
+
+            let socket = null;
+            let socketStart = () => {
+                let listenEvent = (io) => {
+                    io.on('disconnect', (reason) => {
+                        console.log('disconnect > ', reason);
+                    });
+                    io.on('reconnect', (attemptNumber) => {
+                        console.log('reconnect > ', attemptNumber);
+                    });
+                    io.on('reconnect_error', (err) => {
+                        console.log('reconnect_error > ', err);
+                    });
+                    io.on('reconnecting', (attemptNumber) => {
+                        console.log('reconnecting > ', attemptNumber);
+                    });
+                    io.on('connect_timeout', (timeout) => {
+                        console.log('connect_timeout > ', timeout);
+                    });
+                    io.on('connect_error', (err) => {
+                        console.log('connect_error > ', err);
+                    });
+                    io.on('error', (err) => {
+                        console.log('error > ', err);
+                    });
+                };
+
+                post({
+                    url: '/pw/v1/io/token',
+                    data: {
+                        id: 'pw_room', role: 'web'
+                    }
+                }).then((data) => {
+                    socket = io(socket_server, {
+                        'forceNew': true,
+                        'transports': ['websocket'],
+                        query: 'token=' + data.token
+                    });
+
+                    socket.on('connect', () => {
+                        listenEvent(socket);
+                        console.log('connect successfully, pid: ' + socket.id);
+                        socket.emit('enter');
+
+                        socket.on('log', (data) => {
+                            console.log(data);
+                            if(data) {
+                                let ta = $('.log-panel');
+                                //判断Log条数，如果超过限制则删除第一条日志
+                                let items = ta.find(".log-item");
+                                if(items.length === 200){
+                                    items.eq(0).remove();
+                                }
+                                //将日志添加到日志面板
+                                let itemHtml = "<div class='log-item'>" + data.role + ' > ' + (data.content && data.content.length === 1 ? data.content[0] : data.content) + "</div>";
+                                ta.append(itemHtml);
+                                ta.scrollTop(ta.prop("scrollHeight"));
+                            }
+                        })
+                    });
+
+                    socket.on('error', (err) => {
+                        console.error('connected err: ', err);
+                    })
+
+                }).catch((err) => {
+                    console.error('failed to request url[' + url + '], returncode: ' + err.code, err.obj);
+                });
+            };
+
+            socketStart();
+        </script>
+    </div>
+</body>
+</html>
